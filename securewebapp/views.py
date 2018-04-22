@@ -4,8 +4,9 @@ from wsgiref.util import FileWrapper
 from Crypto.SelfTest.PublicKey.test_import_ECC import load_file
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
+from django.urls import reverse
 from django.core.files import File
-from django.http import FileResponse
+from django.http import FileResponse, HttpResponseRedirect
 from django.http import HttpResponse
 import hashlib
 import os, random, struct, tempfile
@@ -26,6 +27,7 @@ from securewebapp.forms import AESKeyForm, SignatureForm, VerifySignatureForm
 
 
 # Create your views here.
+from securewebapp.models import ExtendUser
 
 
 @login_required
@@ -61,6 +63,8 @@ def aes_file_upload(request):
             cipher = AES.new(key, AES.MODE_EAX)
         #    data = "I met aliens in UFO. Here is the map.".encode("utf-8")
             ciphertext, tag = cipher.encrypt_and_digest(myfile.read())
+            print(cipher)
+            print(tag)
 
             file_out = open("encrypted.bin", "wb")
             [file_out.write(x) for x in (cipher.nonce, tag, ciphertext)]
@@ -69,24 +73,24 @@ def aes_file_upload(request):
             file_out.close()
             print('encrypting completed')
 
-            file_in = open("encrypted.bin", "rb")
+            # file_in = open("encrypted.bin", "rb")
 
-            euser = request.user.extenduser
-            euser.submitted_file = myfile
-            encrypted_f = File(file_in)
-            euser.aes_encrypted_file = encrypted_f
-            euser.save()
+            # euser = request.user.extenduser
+            # euser.submitted_file = myfile
+            # encrypted_f = File(file_in)
+            # euser.aes_encrypted_file = encrypted_f
+            # euser.save()
 
-            tmp = tempfile.NamedTemporaryFile(delete=False)
+            tmp = tempfile.NamedTemporaryFile(prefix='aes_encrypted')
             try:
-                tmp = tempfile.NamedTemporaryFile(delete=False)
+                # tmp = tempfile.NamedTemporaryFile(delete=False)
                 with open(tmp.name, 'wb') as fi:
                     [fi.write(x) for x in (cipher.nonce, tag, ciphertext)]
                 response = FileResponse(open(tmp.name, 'rb'))
                 response['content_type'] = 'plain/text'
                 return HttpResponse(response, content_type='plain/text')
             finally:
-                pass
+                tmp.close()
                 # os.remove(tmp.name)
         else:
             print(form.errors)
@@ -102,11 +106,13 @@ def aes_file_decrypt(request):
 
             key_to_encrypt = form.cleaned_data['key']
             key = hashlib.sha3_256(key_to_encrypt.encode('utf-8')).digest()
-
+            file_out = open("encrypted.bin", "wb")
+            [file_out.write(x) for x in myfile]
+            file_out.close()
             tmp = tempfile.NamedTemporaryFile(delete=False)
             try:
                 tmp = tempfile.NamedTemporaryFile(delete=False)
-                file_in = open(myfile.name, "rb")
+                file_in = open(file_out.name, "rb")
                 nonce, tag, ciphertext = [file_in.read(x) for x in (16, 16, -1)]
                 cipher = AES.new(key, AES.MODE_EAX, nonce)
                 try:
@@ -159,24 +165,7 @@ def generate_digital_signature(request):
             # signer = DSS.new(key, 'fips-186-3')
             # signature = signer.sign(h)
 
-
-            # public and private key geneator
-            key = RSA.generate(2048)
-            public_key = key.publickey().exportKey("PEM")
-            private_key = key.exportKey("PEM")
-            f = open('myRSAkey.pem', 'wb')
-            user = request.user
-            user.extenduser.private_key = private_key
-            user.extenduser.public_key = public_key
-            user.save()
-            f.write(private_key)
-            f.close()
-            p = open('myPUBkey.pem', 'wb')
-            p.write(public_key)
-            p.close()
             f = open('myRSAkey.pem', 'r')
-            p = open('myPUBkey.pem', 'r')
-
             key = RSA.import_key(f.read())
             myfile_read = myfile.read()
             # h = MD5.new(myfile.read())
@@ -184,7 +173,7 @@ def generate_digital_signature(request):
             signature = pss.new(key).sign(h)
 
             # now we want to create a new file with the signature + hash of encrypted file (submitted by user)
-            file_out = open("signedDoc.bin", "wb")
+            file_out = open("signedDoc", "wb")
             [file_out.write(x) for x in (signature, myfile_read)]
             file_out.close()
 
@@ -193,7 +182,7 @@ def generate_digital_signature(request):
                 tmp = tempfile.NamedTemporaryFile(delete=False)
                 with open(tmp.name, 'wb') as fi:
                     [fi.write(x) for x in (signature, myfile_read)]
-                response = FileResponse(open(tmp.name, 'rb'))
+                response = FileResponse(open(file_out.name, 'rb'))
                 response['content_type'] = 'plain/text'
                 return HttpResponse(response, content_type='plain/text')
             finally:
@@ -201,7 +190,7 @@ def generate_digital_signature(request):
                 # os.remove(tmp.name)
 
             # Sanity check for resulting document
-            file_in = open("signedDoc.bin", "rb")
+            file_in = open("signedDoc", "rb")
             obtained_signature, org_doc = [file_in.read(x) for x in (256, -1)]
             if obtained_signature == signature:
                 print("we fucking rule !!!!")
@@ -212,10 +201,11 @@ def generate_digital_signature(request):
             hed = MD5.new(myfile_read)
             verifier = pss.new(pub_key)
             try:
-                verifier.verify(hed, signature)
+                verifier.verify(hed, obtained_signature)
                 print("The signature is authentic.")
             except (ValueError, TypeError):
                 print("The signature is not authentic.")
+            file_in.close()
 
             # simple sanity check
             # message = b'to be signed'
@@ -229,8 +219,26 @@ def generate_digital_signature(request):
             #     print("The real deal nigga!!")
             # except (ValueError, TypeError):
             #     print("The signature is not authentic.")
-            print('blancas nalgonas')
+            print('blancas')
     return render(request, 'home.html', context_dict)
+
+
+@login_required
+def download_public_key(request):
+    p = open('myPUBkey.pem', 'r')
+
+    tmp = tempfile.NamedTemporaryFile(delete=False)
+    try:
+        tmp = tempfile.NamedTemporaryFile(delete=False)
+        with open(tmp.name, 'w') as fi:
+            fi.write(p.read())
+        response = FileResponse(open(tmp.name, 'rb'))
+        response['content_type'] = 'plain/text'
+        return HttpResponse(response, content_type='plain/text')
+    finally:
+        pass
+        # os.remove(tmp.name)
+    pass
 
 
 @login_required
@@ -239,31 +247,73 @@ def verify_digital_signature(request):
     if request.method == 'POST' and request.FILES['file_to_verify'] and request.FILES['public_key']:
         form = VerifySignatureForm(request.POST, request.FILES)
         if form.is_valid():
-            # myfile = request.FILES['file_to_sign']
-            myfile = form.cleaned_data.get('file_to_verify')
-            # pub_key = RSA.import_key(open('myPUBkey.pem').read())
+            file_to_verify = form.cleaned_data.get('file_to_verify')
             public_key_file = form.cleaned_data.get('public_key')
-            public_key = open(public_key_file.name, "rb")
-            pub_key = RSA.import_key(public_key.read())
+            file_out = open("tempubkey.pem", "wb")
+            [file_out.write(x) for x in public_key_file]
+            file_out.close()
+            public_key = open(file_out.name, "rb")
+            try:
+                pub_key = RSA.import_key(public_key.read())
+            except (ValueError, TypeError):
+                print("The signature is not authentic.")
+                return HttpResponseRedirect(reverse('not_authentic'), context_dict)
+
             db_pub_key = RSA.import_key(request.user.extenduser.public_key)
+
+            p = open('myPUBkey.pem', 'r')
+            stored_pubkey = RSA.import_key(p.read())
+
             if pub_key == db_pub_key:
                 print("we got it")
-            myfile_read = myfile.read()
-            hed = MD5.new(myfile_read)
+            elif stored_pubkey == pub_key:
+
+                print('stored_pubkey == pub_key equal')
+            elif stored_pubkey == db_pub_key:
+                print('stored_pubkey == db_pub_key  equal')
+            else:
+                print(pub_key)
+                print(db_pub_key)
+
+            myfile_read = file_to_verify.read()
+            usrfile_out = open("tempupuser", "wb")
+            [usrfile_out.write(x) for x in (myfile_read,)]
+            usrfile_out.close()
+
             verifier = pss.new(pub_key)
-            file_in = open(myfile.name, "rb")
+            file_in = open(usrfile_out.name, "rb")
             obtained_signature, org_doc = [file_in.read(x) for x in (256, -1)]
+            hed = MD5.new(org_doc)
             try:
                 verifier.verify(hed, obtained_signature)
                 print("The signature is authentic.")
+                return HttpResponseRedirect(reverse('authentic'), context_dict)
             except (ValueError, TypeError):
                 print("The signature is not authentic.")
+                return HttpResponseRedirect(reverse('not_authentic'), context_dict)
     return render(request, 'home.html', context_dict)
 
 
+@login_required
+def authentic(request):
+    return render(request, 'authentic.html')
+
+
+@login_required
+def not_authentic(request):
+    return render(request, 'not-authentic.html')
+
+
 def generate_keys():
+    # public and private key geneator
     key = RSA.generate(2048)
-    private_key = key.export_key()
-    public_key = key.publickey().export_key()
+    public_key = key.publickey().exportKey("PEM")
+    private_key = key.exportKey("PEM")
+    f = open('myRSAkey.pem', 'wb')
+    f.write(private_key)
+    f.close()
+    p = open('myPUBkey.pem', 'wb')
+    p.write(public_key)
+    p.close()
     return public_key, private_key
 

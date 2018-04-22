@@ -23,8 +23,11 @@ urlpatterns = [
     url(r'^$', views.home, name='home'),
     url(r'^aes/file_upload', views.aes_file_upload, name='aes_file_upload'),
     url(r'^aes/file_decrypt', views.aes_file_decrypt, name='aes_file_decrypt'),
+    url(r'^download/pub_key', views.download_public_key, name='download_public_key'),
     url(r'^digital_signature/sign', views.generate_digital_signature, name='generate_digital_signature'),
     url(r'^digital_signature/verify', views.verify_digital_signature, name='verify_digital_signature'),
+    url(r'^digital_signature/authentic', views.authentic, name='authentic'),
+    url(r'^digital_signature/not-authentic', views.not_authentic, name='not_authentic'),
     # Accounts
     url(r'^accounts/', include('accounts.urls')),
     url(r'^admin/', admin.site.urls),

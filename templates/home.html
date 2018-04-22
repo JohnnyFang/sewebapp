@@ -5,8 +5,13 @@
     <h2>Welcome, {{ user.username }}!</h2>
   </div>
   <div>
-    <b>SHA-1</b> {{ user.extenduser.password_sha1 }}
+    <b>SHA-1  hash: </b> {{ user.extenduser.password_sha1 }}
   </div>
+  <br>
+  <div>
+  <a href="{% url 'download_public_key' %}"> download public key</a>
+  </div>
+  <br>
   <div>
     <h3>AES File Encryption</h3>
     <form action="{% url 'aes_file_upload' %}" method="post" enctype="multipart/form-data">
@@ -19,6 +24,7 @@
       <p>File uploaded at: <a href="{{ uploaded_file_url }}">{{ uploaded_file_url }}</a></p>
     {% endif %}
   </div>
+  <br>
   <div>
     <h3>AES File Decryption</h3>
     <form action="{% url 'aes_file_decrypt' %}" method="post" enctype="multipart/form-data">
@@ -31,6 +37,7 @@
       <p>File uploaded at: <a href="{{ uploaded_file_url }}">{{ uploaded_file_url }}</a></p>
     {% endif %}
   </div>
+  <br>
   <div>
     <h3>Digital Signature</h3>
     <form action="{% url 'generate_digital_signature' %}" method="post" enctype="multipart/form-data">
@@ -40,9 +47,9 @@
     </form>
 
     <div>
-{#      <p>{{ user.extenduser.public_key }}</p>#}
     </div>
   </div>
+  <br>
   <div>
     <h3>Verify Digital Signature</h3>
     <form action="{% url 'verify_digital_signature' %}" method="post" enctype="multipart/form-data">
