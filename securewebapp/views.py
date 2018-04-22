@@ -9,6 +9,8 @@ from django.core.files import File
 from django.http import FileResponse, HttpResponseRedirect
 from django.http import HttpResponse
 import hashlib
+if sys.version_info < (3,6):
+    import sha3
 import os, random, struct, tempfile
 from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
