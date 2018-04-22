@@ -25,7 +25,7 @@ SECRET_KEY = 'vydld96e7ol)g@el@)$=qze4rinftm6+gh9e8)afz0g4(*pad#'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['sewebapp.scidev.co','localhost', '127.0.0.1']
 
 
 # Application definition
