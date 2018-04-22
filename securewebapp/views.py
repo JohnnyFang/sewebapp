@@ -19,9 +19,6 @@ from Crypto.Hash import SHA256, MD5
 from Crypto.PublicKey import ECC
 from Crypto.Signature import DSS
 
-from OpenSSL import crypto
-
-from django.core.files.storage import FileSystemStorage
 
 from django.contrib.auth.models import User
 
