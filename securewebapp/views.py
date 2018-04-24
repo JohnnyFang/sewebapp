@@ -123,8 +123,8 @@ def aes_file_decrypt(request):
                     print('something fuck up')
                     return HttpResponse('The message has been tampered with or the key is incorrect.')
 
-                with open(tmp.name, 'w') as fi:
-                    fi.write(data.decode("utf-8"))
+                with open(tmp.name, 'wb') as fi:
+                    fi.write(data)
 
                 response = FileResponse(open(tmp.name, 'rb'))
                 response['content_type'] = 'plain/text'
